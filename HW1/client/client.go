@@ -40,50 +40,58 @@ func main() {
     f, _ := os.Create("./result.csv")
     defer f.Close()
 
-    const num_samples = 100
-    var samples [3*num_samples]timing_endpoint
-    var measurements [num_samples]my_sample
-    for i := 0; i < num_samples; i++ {
-        conn, err := net.Dial("tcp", "100.81.2.162:8080")
-        if err != nil {
-            // handle error
-        }   
-        // Send current time
-        fmt.Fprintf(conn, strconv.FormatInt(time.Now().UnixNano(),10)+"\n")
-        // Read response from server
-        status, _ := bufio.NewReader(conn).ReadString('\n')
-        // Record response arrival time
-        t_dst := time.Now().UnixNano()
+    
+    //time_between_samples := 100
 
-        // Parse server response
-        result := strings.Split(status, ",")
-        t_org,_ := strconv.ParseInt(result[0],10,64)
-        t_rec,_ := strconv.ParseInt(result[1],10,64)
-        t_xmt,_ := strconv.ParseInt(strings.TrimSpace(result[2]),10,64)
+    for j := 0; j < 70; j++ {
+        const num_samples = 100
+        var samples [3*num_samples]timing_endpoint
+        var measurements [num_samples]my_sample
+        for i := 0; i < num_samples; i++ {
+            conn, err := net.Dial("tcp", "100.81.2.162:8080")
+            if err != nil {
+                // handle error
+            }   
+            // Send current time
+            fmt.Fprintf(conn, strconv.FormatInt(time.Now().UnixNano(),10)+"\n")
+            // Read response from server
+            status, _ := bufio.NewReader(conn).ReadString('\n')
+            // Record response arrival time
+            t_dst := time.Now().UnixNano()
 
-        // Calculate round trip time and offset
-        rtt := (t_dst - t_org) - (t_xmt - t_rec)
-        offsetf := 0.5 * float64((t_rec - t_org) + (t_xmt - t_dst))
-        offset := int64(offsetf)
-        //fmt.Println("RTT: " + strconv.FormatInt(rtt, 10))
-        //  fmt.Println("Offset: " + strconv.FormatInt(offset, 10))
-        samples[3*i] = timing_endpoint{offset - rtt/2, -1}
-        samples[3*i + 1] = timing_endpoint{offset, 0}
-        samples[3*i + 2] = timing_endpoint{offset + rtt/2, 1}
+            // Parse server response
+            result := strings.Split(status, ",")
+            t_org,_ := strconv.ParseInt(result[0],10,64)
+            t_rec,_ := strconv.ParseInt(result[1],10,64)
+            t_xmt,_ := strconv.ParseInt(strings.TrimSpace(result[2]),10,64)
 
-        measurements[i] = my_sample{offset, rtt/2}
+            // Calculate round trip time and offset
+            rtt := (t_dst - t_org) - (t_xmt - t_rec)
+            offsetf := 0.5 * float64((t_rec - t_org) + (t_xmt - t_dst))
+            offset := int64(offsetf)
+            //fmt.Println("RTT: " + strconv.FormatInt(rtt, 10))
+            //  fmt.Println("Offset: " + strconv.FormatInt(offset, 10))
+            samples[3*i] = timing_endpoint{offset - rtt/2, -1}
+            samples[3*i + 1] = timing_endpoint{offset, 0}
+            samples[3*i + 2] = timing_endpoint{offset + rtt/2, 1}
 
-        
-        f.Write([]byte(strconv.FormatInt(rtt, 10) +"," + strconv.FormatInt(offset, 10) + "\n"))
+            measurements[i] = my_sample{offset, rtt/2}
 
+            
+            
+
+        }
+
+        l, u := selection_alg(samples[:])
+        //fmt.Println("Lower bound: " + strconv.FormatInt(l,10))
+        //fmt.Println("Upper Bound: " + strconv.FormatInt(u,10))
+        clustered_samps := cluster_algorithm(measurements[:],l,u)
+        final_offset := combining_algorithm(clustered_samps[:])
+        //fmt.Println("Final Offset: ", final_offset)
+        f.Write([]byte(strconv.FormatInt(time.Now().UnixNano(), 10) +"," + strconv.FormatInt(final_offset, 10) + "," + strconv.FormatInt(measurements[0].time, 10) + "," + strconv.FormatInt(measurements[0].lambda, 10) + "\n"))
+
+        time.Sleep(1 * time.Millisecond)
     }
-
-    l, u := selection_alg(samples[:])
-    fmt.Println("Lower bound: " + strconv.FormatInt(l,10))
-    fmt.Println("Upper Bound: " + strconv.FormatInt(u,10))
-    clustered_samps := cluster_algorithm(measurements[:],l,u)
-    final_offset := combining_algorithm(clustered_samps[:])
-    fmt.Println("Final Offset: ", final_offset)
     
 }
 
@@ -111,7 +119,7 @@ func selection_alg(samples timing_endpoints) (int64, int64) {
             }
             // if c >= m - f, stop and set l = current low point
             if c >= (m - f) {
-                fmt.Println("Setting l to ",samples[i].time)
+                //fmt.Println("Setting l to ",samples[i].time)
                 // Set l = current low point
                 l = samples[i].time
                 break
@@ -128,7 +136,7 @@ func selection_alg(samples timing_endpoints) (int64, int64) {
                 d++
             }
             // If c >= m - f, stop and set u = current high point
-            fmt.Println("C: ",c)
+            //fmt.Println("C: ",c)
             if c >= (m - f) {
                 // Set u = current high position
                 u = samples[i].time
@@ -140,7 +148,7 @@ func selection_alg(samples timing_endpoints) (int64, int64) {
         if (d <= f && l < u) {
             // Yes => SUCCESS
             // intersection interval is [l,u]
-            fmt.Println("f:",f)
+            //fmt.Println("f:",f)
             return l, u
             break
         } else {
@@ -168,11 +176,11 @@ func cluster_algorithm(samples []my_sample, l int64, u int64) []my_sample {
             // this sample is outside the correct interval
             samples[i] = samples[len(samples) - 1]
             samples = samples[:len(samples)-1]
-            fmt.Println("Removed a bad sample")
+            //fmt.Println("Removed a bad sample")
         }
     }
 
-    min_samples := 40
+    min_samples := 30
     m := len(samples)
     phi := make([]int64,m,m)
     for m > min_samples {
@@ -194,7 +202,7 @@ func cluster_algorithm(samples []my_sample, l int64, u int64) []my_sample {
         samples[max_idx] = samples[m - 1]
         samples = samples[:m-1]
         m = len(samples)
-        fmt.Println("m: ",m)
+        //fmt.Println("m: ",m)
     }
     return samples
 }

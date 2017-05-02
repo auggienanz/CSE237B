@@ -3,14 +3,17 @@
 
 % Import data
 data = csvread('./client/result.csv');
-rtt = data(:,1)./1e3;
-offset = data(:,2)./1e3;
+time = (data(:,1) - data(1,1))./1e9;
+ntp = data(:,2)./1e6;
+offset = data(:,3)./1e6;
+lambda = data(:,4)./1e6;
 
 % Plot RTT, offset, and bound on error
 figure;
-plot(offset);
+plot(time, offset);
 hold on
-plot(offset - rtt./2,':');
-plot(offset + rtt./2,':');
-legend('Offset','Lower Bound','Upper Bound');
+plot(time, offset - lambda,':');
+plot(time, offset + lambda,':');
+plot(time, ntp);
+legend('Offset','Lower Bound','Upper Bound', 'NTP');
 ylabel('ms');
