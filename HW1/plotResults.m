@@ -2,7 +2,7 @@
 % August Nanz
 
 % Import data
-data = csvread('result.csv');
+data = csvread('./client/result.csv');
 rtt = data(:,1)./1e3;
 offset = data(:,2)./1e3;
 
