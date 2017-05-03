@@ -20,16 +20,22 @@ func main() {
             fmt.Println("Error accepting")
             // handle error
         }
+        fmt.Println("Opened new connection")
         go handleConnection(conn)
     }
 }
 
 func handleConnection(conn net.Conn) {
-    // Get time that client sent
-    t_org, _ := bufio.NewReader(conn).ReadString('\n')
-    // Record arrival time
-    t_rec := time.Now().UnixNano()
-    // Respond with client send time, arrival time, and server xmit time
-    conn.Write([]byte(strings.TrimSpace(t_org) + "," + strconv.FormatInt(t_rec, 10) + ","+ strconv.FormatInt(time.Now().UnixNano(),10) + "\n"))
-    // fmt.Println("Sent response to the client")
+    for {
+        // Get time that client sent
+        t_org, err := bufio.NewReader(conn).ReadString('\n')
+        if err != nil {
+            return
+        }
+        // Record arrival time
+        t_rec := time.Now().UnixNano()
+        // Respond with client send time, arrival time, and server xmit time
+        conn.Write([]byte(strings.TrimSpace(t_org) + "," + strconv.FormatInt(t_rec, 10) + ","+ strconv.FormatInt(time.Now().UnixNano(),10) + "\n"))
+        // fmt.Println("Sent response to the client")
+    }
 }

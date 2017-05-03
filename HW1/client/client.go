@@ -43,15 +43,17 @@ func main() {
     
     //time_between_samples := 100
 
-    for j := 0; j < 70; j++ {
-        const num_samples = 100
+    for j := 0; j < 500; j++ {
+        const num_samples = 50
         var samples [3*num_samples]timing_endpoint
         var measurements [num_samples]my_sample
+        conn, err := net.Dial("tcp", "100.81.2.162:8080")
+        if err != nil {
+            // handle error
+        }
+        defer conn.Close()
         for i := 0; i < num_samples; i++ {
-            conn, err := net.Dial("tcp", "100.81.2.162:8080")
-            if err != nil {
-                // handle error
-            }   
+               
             // Send current time
             fmt.Fprintf(conn, strconv.FormatInt(time.Now().UnixNano(),10)+"\n")
             // Read response from server
@@ -76,10 +78,6 @@ func main() {
             samples[3*i + 2] = timing_endpoint{offset + rtt/2, 1}
 
             measurements[i] = my_sample{offset, rtt/2}
-
-            
-            
-
         }
 
         l, u := selection_alg(samples[:])
@@ -88,7 +86,14 @@ func main() {
         clustered_samps := cluster_algorithm(measurements[:],l,u)
         final_offset := combining_algorithm(clustered_samps[:])
         //fmt.Println("Final Offset: ", final_offset)
-        f.Write([]byte(strconv.FormatInt(time.Now().UnixNano(), 10) +"," + strconv.FormatInt(final_offset, 10) + "," + strconv.FormatInt(measurements[0].time, 10) + "," + strconv.FormatInt(measurements[0].lambda, 10) + "\n"))
+        var time_sum, lambda_sum int64
+        for i := 0; i < num_samples; i++ {
+            time_sum += measurements[i].time
+            lambda_sum += measurements[i].lambda
+        }
+        time_sum = time_sum/num_samples
+        lambda_sum = lambda_sum/num_samples
+        f.Write([]byte(strconv.FormatInt(time.Now().UnixNano(), 10) +"," + strconv.FormatInt(final_offset, 10) + "," + strconv.FormatInt(int64(time_sum), 10) + "," + strconv.FormatInt(int64(lambda_sum), 10) + "\n"))
 
         time.Sleep(1 * time.Millisecond)
     }
@@ -180,7 +185,7 @@ func cluster_algorithm(samples []my_sample, l int64, u int64) []my_sample {
         }
     }
 
-    min_samples := 30
+    min_samples := 15
     m := len(samples)
     phi := make([]int64,m,m)
     for m > min_samples {

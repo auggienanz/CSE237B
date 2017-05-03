@@ -16,4 +16,5 @@ plot(time, offset - lambda,':');
 plot(time, offset + lambda,':');
 plot(time, ntp);
 legend('Offset','Lower Bound','Upper Bound', 'NTP');
-ylabel('ms');
+ylabel('Offset (ms)');
+xlabel('Time (s)');
