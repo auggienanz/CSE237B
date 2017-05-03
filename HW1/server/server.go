@@ -36,6 +36,5 @@ func handleConnection(conn net.Conn) {
         t_rec := time.Now().UnixNano()
         // Respond with client send time, arrival time, and server xmit time
         conn.Write([]byte(strings.TrimSpace(t_org) + "," + strconv.FormatInt(t_rec, 10) + ","+ strconv.FormatInt(time.Now().UnixNano(),10) + "\n"))
-        // fmt.Println("Sent response to the client")
     }
 }

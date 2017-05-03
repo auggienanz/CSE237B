@@ -15,7 +15,7 @@ type timing_endpoint struct {
     kind int
 }
 
-type my_sample struct {
+type timing_sample struct {
     time int64
     lambda int64
 }
@@ -35,24 +35,27 @@ func (slice timing_endpoints) Swap(i, j int) {
 }
 
 func main() {
-    
-
+    // Create a file to write data to
     f, _ := os.Create("./result.csv")
     defer f.Close()
 
-    
-    //time_between_samples := 100
-
+    // Take 500 samples
     for j := 0; j < 500; j++ {
-        const num_samples = 50
-        var samples [3*num_samples]timing_endpoint
-        var measurements [num_samples]my_sample
+        // at each time point, take 50 measurements
+        const num_measurements = 50
+        // Store the midpoint and upper/lower bounds
+        var samples [3*num_measurements]timing_endpoint
+        // Store the actual measurements (theta + lambda)
+        var measurements [num_measurements]timing_sample
+        // Connect to the server
         conn, err := net.Dial("tcp", "100.81.2.162:8080")
         if err != nil {
             // handle error
+            fmt.Println("Error connecting to server")
         }
         defer conn.Close()
-        for i := 0; i < num_samples; i++ {
+
+        for i := 0; i < num_measurements; i++ {
                
             // Send current time
             fmt.Fprintf(conn, strconv.FormatInt(time.Now().UnixNano(),10)+"\n")
@@ -71,31 +74,32 @@ func main() {
             rtt := (t_dst - t_org) - (t_xmt - t_rec)
             offsetf := 0.5 * float64((t_rec - t_org) + (t_xmt - t_dst))
             offset := int64(offsetf)
-            //fmt.Println("RTT: " + strconv.FormatInt(rtt, 10))
-            //  fmt.Println("Offset: " + strconv.FormatInt(offset, 10))
+
             samples[3*i] = timing_endpoint{offset - rtt/2, -1}
             samples[3*i + 1] = timing_endpoint{offset, 0}
             samples[3*i + 2] = timing_endpoint{offset + rtt/2, 1}
 
-            measurements[i] = my_sample{offset, rtt/2}
+            measurements[i] = timing_sample{offset, rtt/2}
         }
 
+        // Use the NTP selection algorithm to determine the best lower and upper bounds
         l, u := selection_alg(samples[:])
-        //fmt.Println("Lower bound: " + strconv.FormatInt(l,10))
-        //fmt.Println("Upper Bound: " + strconv.FormatInt(u,10))
+        // Use the NTP clustering algorithm to find the "best" data
         clustered_samps := cluster_algorithm(measurements[:],l,u)
+        // Use the NTP combining algorithm to compute the final filtered offset
         final_offset := combining_algorithm(clustered_samps[:])
-        //fmt.Println("Final Offset: ", final_offset)
+
+        // For comparison, let's do a simple average of the num_measurements timing samples
         var time_sum, lambda_sum int64
-        for i := 0; i < num_samples; i++ {
+        for i := 0; i < num_measurements; i++ {
             time_sum += measurements[i].time
             lambda_sum += measurements[i].lambda
         }
-        time_sum = time_sum/num_samples
-        lambda_sum = lambda_sum/num_samples
-        f.Write([]byte(strconv.FormatInt(time.Now().UnixNano(), 10) +"," + strconv.FormatInt(final_offset, 10) + "," + strconv.FormatInt(int64(time_sum), 10) + "," + strconv.FormatInt(int64(lambda_sum), 10) + "\n"))
+        time_sum = time_sum/num_measurements
+        lambda_sum = lambda_sum/num_measurements
 
-        time.Sleep(1 * time.Millisecond)
+        // Write the data to the results.csv file for analysis in MATLAB
+        f.Write([]byte(strconv.FormatInt(time.Now().UnixNano(), 10) +"," + strconv.FormatInt(final_offset, 10) + "," + strconv.FormatInt(int64(time_sum), 10) + "," + strconv.FormatInt(int64(lambda_sum), 10) + "\n"))
     }
     
 }
@@ -124,7 +128,6 @@ func selection_alg(samples timing_endpoints) (int64, int64) {
             }
             // if c >= m - f, stop and set l = current low point
             if c >= (m - f) {
-                //fmt.Println("Setting l to ",samples[i].time)
                 // Set l = current low point
                 l = samples[i].time
                 break
@@ -141,7 +144,6 @@ func selection_alg(samples timing_endpoints) (int64, int64) {
                 d++
             }
             // If c >= m - f, stop and set u = current high point
-            //fmt.Println("C: ",c)
             if c >= (m - f) {
                 // Set u = current high position
                 u = samples[i].time
@@ -153,9 +155,7 @@ func selection_alg(samples timing_endpoints) (int64, int64) {
         if (d <= f && l < u) {
             // Yes => SUCCESS
             // intersection interval is [l,u]
-            //fmt.Println("f:",f)
             return l, u
-            break
         } else {
             // Add 1 to f
             f = f + 1
@@ -174,17 +174,17 @@ func selection_alg(samples timing_endpoints) (int64, int64) {
     return 0, 0
 }
 
-func cluster_algorithm(samples []my_sample, l int64, u int64) []my_sample {
+func cluster_algorithm(samples []timing_sample, l int64, u int64) []timing_sample {
     // Remove any samples that are not in the correct interval
     for i := 0; i < len(samples); i++ {
         if samples[i].time < l || samples[i].time > u {
             // this sample is outside the correct interval
             samples[i] = samples[len(samples) - 1]
             samples = samples[:len(samples)-1]
-            //fmt.Println("Removed a bad sample")
         }
     }
 
+    // Compute the statistical jitter of each "survivor" and discard until we get to min_samples
     min_samples := 15
     m := len(samples)
     phi := make([]int64,m,m)
@@ -207,12 +207,11 @@ func cluster_algorithm(samples []my_sample, l int64, u int64) []my_sample {
         samples[max_idx] = samples[m - 1]
         samples = samples[:m-1]
         m = len(samples)
-        //fmt.Println("m: ",m)
     }
     return samples
 }
 
-func combining_algorithm(samples []my_sample) int64 {
+func combining_algorithm(samples []timing_sample) int64 {
     var y, z float64
     for i := 0; i < len(samples); i++ {
         y += 1/float64(samples[i].lambda)
