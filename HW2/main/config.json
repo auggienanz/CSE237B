@@ -1,0 +1,40 @@
+{
+    "topology": {
+        "source": {
+            "outputs": {
+                "a": 1,
+                "c": 1
+            }
+        },
+        "a": {
+            "inputs": {
+                "source": 1
+            },
+            "outputs": {
+                "b": 3
+            }
+        },
+        "b": {
+            "inputs": {
+                "a": 1
+            },
+            "outputs": {
+                "drain": 1
+            }            
+        },
+        "c": {
+            "inputs": {
+                "source": 1
+            },
+            "outputs": {
+                "drain": 1
+            }
+        },
+        "drain": {
+            "inputs": {
+                "b": 3,
+                "c": 1
+            }
+        }
+    }
+}
