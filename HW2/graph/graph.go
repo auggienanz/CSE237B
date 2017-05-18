@@ -72,12 +72,23 @@ func ConstructGraph(graphConfig *config.GraphConfig) *Graph {
 			graph.Nodes[nodeName] = node
 		}
 
-		/*
-			To be completed:
-			1. Initialize the newly created nodes;
-			2. Create channels that are necessary for data communication.
-		*/
-	}
+		if node.Name == "source" {
+			node.IsSource = true
+		} else {
+			for inputNode, val := range nodeConfig.Inputs {
+				node.Inputs[inputNode] = val
+				channels[inputNode + "-" + node.Name] = make(chan Message, CHANNEL_SIZE)
+			}
+		}
 
+		if node.Name == "drain" {
+			node.IsDrain = true
+		} else {
+			for outputNode, val := range nodeConfig.Outputs {
+				node.Outputs[outputNode] = val
+				channels[node.Name + "-" + outputNode] = make(chan Message, CHANNEL_SIZE)
+			}
+		}
+	}
 	return graph
 }
