@@ -30,7 +30,7 @@ func (queue ByDeadline) Swap(i, j int) {
 }
 
 func (queue ByDeadline) Less(i, j int) bool {
-	return queue[i].TaskID < queue[j].TaskID
+	return queue[j].Deadline.After(queue[i].Deadline)
 }
 
 // ScheduleLoop runs the scheduling algorithm inside a goroutine
@@ -47,17 +47,31 @@ loop:
 			sort.Sort(ByDeadline(s.TaskBuf.Queue))
 			// If there's a free worker, assign this task
 			s.FreeWorkerBuf.Lock.Lock()
-			if (len(s.FreeWorkerBuf.Pool) != 0) {
+			if len(s.FreeWorkerBuf.Pool) != 0 {
 				s.FreeWorkerBuf.Pool[0].TaskChan <- s.TaskBuf.Queue[0]
 				s.FreeWorkerBuf.Pool = s.FreeWorkerBuf.Pool[1:]
 				s.TaskBuf.Queue = s.TaskBuf.Queue[1:]
+			} else if c.EN_PREEMPT {
+				// check all currently running tasks
+				for _,w := range(s.AllWorkerBuf.Pool) {
+					// If the current task has a further deadline, preempt
+					if (s.TaskBuf.Queue[0].Deadline.Before(w.CurrentTask.Deadline)) {
+						w.PreemptChan <- 0
+					}
+				}
 			}
 			s.FreeWorkerBuf.Lock.Unlock()
 			s.TaskBuf.Lock.Unlock()
 		case w := <-s.WorkerChan:
 			// A worker becomes free
-			// If there's a task in the queue, assign it to this worker
 			s.TaskBuf.Lock.Lock()
+			
+			// Check if its task finished. If not, we need to add the task back to the queue
+			if (w.CurrentTask.TotalRunTime > w.CurrentTask.RunTime) {
+				s.TaskBuf.Queue = append(s.TaskBuf.Queue, w.CurrentTask)
+				sort.Sort(ByDeadline(s.TaskBuf.Queue))
+			}
+			// If there's a task in the queue, assign it to this worker
 			if (len(s.TaskBuf.Queue) != 0) {
 				w.TaskChan <- s.TaskBuf.Queue[0]
 				s.TaskBuf.Queue = s.TaskBuf.Queue[1:]
@@ -106,6 +120,7 @@ func NewScheduler() *Scheduler{
 			TaskChan: make(chan *task.Task),
 			StopChan: make(chan interface{}),
 			FinishChan: s.WorkerChan,
+			PreemptChan: make(chan interface{}),
 		}
 		s.AllWorkerBuf.Pool = append(s.AllWorkerBuf.Pool, w)
 		s.FreeWorkerBuf.Pool = append(s.FreeWorkerBuf.Pool, w)
