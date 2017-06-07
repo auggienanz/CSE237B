@@ -27,13 +27,15 @@ func main() {
 		},
 	}
 
+	// Create and initialize the scheduler
+	sched := scheduler.NewScheduler()
+
 	// Create all applications
 	for i, taskSpec := range taskSpecs {
 		apps = append(apps, task.NewApp(fmt.Sprintf("app%d", i), taskSpec))
 	}
 
-	// Create and initialize the scheduler
-	sched := scheduler.NewScheduler()
+	
 	// To be implemented, initialization process
 
 	// Start the scheduler
@@ -41,6 +43,7 @@ func main() {
 
 	// Start all applications
 	for _, app := range apps {
+		app.TaskChan = sched.TaskChan
 		app.Start()
 	}
 

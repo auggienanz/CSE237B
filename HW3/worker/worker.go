@@ -3,6 +3,7 @@ package worker
 import (
 	"log"
 	"sync"
+	"time"
 	"CSE237B/HW3/task"
 )
 
@@ -21,6 +22,7 @@ type Worker struct {
 	WorkerID int
 	TaskChan chan *task.Task
 	StopChan chan interface{}
+	FinishChan chan *Worker
 }
 
 // TaskProcessLoop processes tasks without preemption
@@ -32,6 +34,8 @@ loop:
 		case t := <-w.TaskChan:
 			// This worker receives a new task to run
 			// To be implemented
+			w.Process(t)
+			w.FinishChan <- w
 		case <-w.StopChan:
 			// Receive signal to stop
 			// To be implemented
@@ -45,6 +49,7 @@ loop:
 func (w *Worker) Process(t *task.Task) {
 	log.Printf("Worker <%d>: App<%s>/Task<%d> starts (ddl %v)\n", w.WorkerID, t.AppID, t.TaskID, t.Deadline)
 	// Process the task
+	time.Sleep(t.TotalRunTime)
 	// To be implemented
 	log.Printf("Worker <%d>: App<%s>/Task<%d> ends\n", w.WorkerID, t.AppID, t.TaskID)
 }
