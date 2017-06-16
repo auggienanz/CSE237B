@@ -36,11 +36,11 @@ func (slice timing_endpoints) Swap(i, j int) {
 
 func main() {
     // Create a file to write data to
-    f, _ := os.Create("./result.csv")
+    f, _ := os.Create("../offset.txt")
     defer f.Close()
 
-    // Take 500 samples
-    for j := 0; j < 500; j++ {
+    // Just take 1 measurement to synchronize clocks
+    for j := 0; j < 1; j++ {
         // at each time point, take 50 measurements
         const num_measurements = 50
         // Store the midpoint and upper/lower bounds
@@ -48,7 +48,7 @@ func main() {
         // Store the actual measurements (theta + lambda)
         var measurements [num_measurements]timing_sample
         // Connect to the server
-        conn, err := net.Dial("tcp", "100.81.2.162:8080")
+        conn, err := net.Dial("tcp", "192.168.1.95:8080")
         if err != nil {
             // handle error
             fmt.Println("Error connecting to server")
@@ -99,7 +99,7 @@ func main() {
         lambda_sum = lambda_sum/num_measurements
 
         // Write the data to the results.csv file for analysis in MATLAB
-        f.Write([]byte(strconv.FormatInt(time.Now().UnixNano(), 10) +"," + strconv.FormatInt(final_offset, 10) + "," + strconv.FormatInt(int64(time_sum), 10) + "," + strconv.FormatInt(int64(lambda_sum), 10) + "\n"))
+        f.Write([]byte(strconv.FormatInt(time.Now().UnixNano(), 10) +"," + strconv.FormatInt(final_offset, 10) + "\n"))
     }
     
 }
