@@ -8,6 +8,8 @@ import "strconv"
 import "golang.org/x/exp/mmap"
 import "os"
 import "strings"
+import "math"
+
 func main() {
     // Read time offset from file
     reader, err := mmap.Open("../offset.txt")
@@ -39,6 +41,15 @@ func main() {
     defer f.Close()
 
     t_start := time.Now().UnixNano()
+
+    // Variables and parameters we'll need
+    alpha := 0.01
+    beta := 0.4
+    kappa := 0.8
+    y_s := 0.0
+    y_up := 0.0
+    y_var := 0.0
+
     // Collect data for 5 minutes
     for time.Now().UnixNano() - t_start < 300000000000 {
         resp, err := http.Get("http://192.168.1.95:8081/red")
@@ -57,7 +68,11 @@ func main() {
 
         latency := t_rcv + t_offset - t_send;
 
+        y_var = (1 - beta) * y_var + beta * math.Abs(y_s - float64(latency))
+        y_s = (1 - alpha) * y_s + alpha * float64(latency)
+        y_up = y_s + kappa * y_var 
+
         // Write the results to a file
-        f.Write([]byte(strconv.FormatInt(t_rcv, 10) +"," + strconv.FormatInt(latency, 10) + "\n"))
-    }}
+        f.Write([]byte(strconv.FormatInt(t_rcv, 10) + "," + strconv.FormatInt(latency, 10) + "," + strconv.FormatInt(int64(y_s), 10) + "," + strconv.FormatInt(int64(y_up),10) + "\n"))
+    }
 }

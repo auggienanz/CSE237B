@@ -1,5 +1,9 @@
 package main
 
+/* Modified from:
+http://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
+*/
+
 import (
     "bytes"
     "encoding/base64"
